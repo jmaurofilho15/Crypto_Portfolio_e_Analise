@@ -1,0 +1,33 @@
+```r
+library(quantmod); library(corrplot); library(PerformanceAnalytics);
+library(corrplot)
+
+tickers <- c('BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD','XLM-USD', 'ADA-USD', 
+             'AVAX-USD', 'DOT-USD', 'ENA-USD', 'LINK-USD', 'NEAR-USD', 
+             'RENDER-USD', 'TON-USD', 'TRX-USD', 'UNI-USD')
+StartDate <- as.Date('2024-09-01')
+EndDate <- Sys.Date()
+Tickers.Env <- new.env()
+
+getSymbols(
+  Symbols = tickers,
+  env = Tickers.Env,
+  auto.assign = TRUE,
+  from = StartDate,
+  to = EndDate
+)
+
+Close_Data <- do.call(merge, eapply(Tickers.Env, FUN = Cl))
+Close_Data <- na.omit(Close_Data)
+colnames(Close_Data) <- c("BTC-USD","ETH-USD","SOL-USD","XRP-USD", "XLM-USD",
+                          "ADA-USD","AVAX-USD","DOT-USD","ENA-USD","LINK-USD",
+                          "NEAR-USD","RENDER-USD","TON-USD","TRX-USD","UNI-USD")
+
+Returns_Data <- do.call(merge, lapply(Close_Data, FUN = Return.calculate))
+Returns_Data <- Returns_Data[-1,]
+
+Mean_Returns <- as.matrix(lapply(Returns_Data, mean))
+Std_deviation <- as.matrix(lapply(Returns_Data, sd))
+Cor_matrix <- cor(Returns_Data)
+corrplot(Cor_matrix, method = 'number', type = 'lower')
+```
