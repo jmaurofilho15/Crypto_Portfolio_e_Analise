@@ -1,0 +1,72 @@
+```r
+library(quantmod);library(PerformanceAnalytics);library(PortfolioAnalytics)
+library(DEoptim);library(ROI);library(stringr)
+
+tickers <- c('BTC-USD', 'ETH-USD', 'SOL-USD', 'XRP-USD', 'ADA-USD', 'AVAX-USD',
+             'DOT-USD', 'ENA-USD', 'LINK-USD', 'RENDER-USD', 'TON-USD', 
+             'TRX-USD', 'UNI-USD', 'XLM-USD')
+StartDate <- as.Date('2024-09-01')
+EndDate <- Sys.Date()
+Tickers.Env <- new.env()
+
+getSymbols(
+  Symbols = tickers,
+  env = Tickers.Env,
+  auto.assign = TRUE,
+  from = StartDate,
+  to = EndDate
+)
+
+Close_Data <- do.call(merge, eapply(Tickers.Env, FUN = Cl))
+Close_Data <- na.omit(Close_Data)
+colnames(Close_Data) <- c("RENDER.USD", "XRP.USD", "LINK.USD", "TRX.USD",
+                          "TON.USD", "ETH.USD", "ENA.USD", "XLM.USD", 
+                          "ADA.USD", "UNI.USD", "SOL.USD", "AVAX.USD",
+                          "BTC.USD", "DOT.USD")
+
+Returns_Data <- do.call(merge, lapply(Close_Data, FUN = Return.calculate))
+Returns_Data <- Returns_Data[-1,]
+
+Mean_Returns <- as.matrix(lapply(Returns_Data, mean))
+Std_deviation <- as.matrix(lapply(Returns_Data, sd))
+Cor_matrix <- cor(Returns_Data)
+
+Port.Spec <- portfolio.spec(assets = colnames(Returns_Data))
+
+Port.Spec <- add.constraint(portfolio = Port.Spec, 
+                            type = 'full_investment')
+
+Port.Spec <- add.constraint(portfolio = Port.Spec,
+                            type = "box",
+                            min = c(0.025, 0.10, 0.025, 0.05, 0.05, 0.10, 0.025, 
+                                    0.025, 0.025, 0.025, 0.10, 0.025, 0.10, 0.025),
+                            max = c(0.05, 0.15, 0.05, 0.10, 0.10, 0.15, 0.055, 
+                                    0.055, 0.05, 0.055, 0.15, 0.055, 0.15, 0.05)
+                            )
+
+Port.Spec <- add.objective(portfolio = Port.Spec,
+                           type = "return",
+                           name = "mean")
+
+Port.Spec <- add.objective(portfolio = Port.Spec,
+                           type = "risk",
+                           name = "StdDev")
+
+Opt.Portf <- optimize.portfolio(R = Returns_Data,
+                                portfolio = Port.Spec,
+                                optimize_method = "DEoptim")
+print(Opt.Portf)
+print(extractWeights(Opt.Portf))
+
+Portfolio_Returns <- Return.portfolio(Returns_Data, extractWeights(Opt.Portf))
+charts.PerformanceSummary(Portfolio_Returns)
+
+USDBRL <- getSymbols(Symbols = 'BRL=X', 
+                     auto.assign = FALSE, 
+                     from = Sys.Date(), 
+                     to = Sys.Date()
+                     )
+USDBRL <- Cl(USDBRL)
+USDBRL <- as.numeric(str_extract(USDBRL, '\\d\\.\\d\\d'))
+print(round(extractWeights(Opt.Portf) * round(15000/USDBRL, digits = 0)))
+```
